@@ -3,11 +3,17 @@ package netstats
 import (
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/ikondratev/net-monitor/lib/netinterface"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+)
+
+const (
+	maxConnections = 500
+	connectionTTL  = 2 * time.Minute
 )
 
 type Aggregator struct {
@@ -34,7 +40,6 @@ func (a *Aggregator) ProcessPacket(packet gopacket.Packet) {
 		Proto: ip.Protocol.String(),
 	}
 
-	// Пытаемся достать порты в зависимости от TCP или UDP
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp, _ := tcpLayer.(*layers.TCP)
 		conn.SrcPort = tcp.SrcPort.String()
@@ -48,22 +53,28 @@ func (a *Aggregator) ProcessPacket(packet gopacket.Packet) {
 		conn.DstPort = "-"
 	}
 
-	// Сохраняем/обновляем в map
 	a.mu.Lock()
 	defer a.mu.Unlock()
-
+	now := time.Now()
+	a.cleanupExpired(now)
 	stats, exists := a.networkMap[conn]
 	if !exists {
+		if len(a.networkMap) >= maxConnections {
+			return
+		}
 		stats = &netinterface.ConnStats{}
 		a.networkMap[conn] = stats
 	}
 	stats.PacketCount++
 	stats.TotalBytes += packet.Metadata().Length
+	stats.LastSeen = now
 }
 
 func (a *Aggregator) ConnectionRows() []netinterface.ConnRow {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+
+	a.cleanupExpired(time.Now())
 
 	rows := make([]netinterface.ConnRow, 0, len(a.networkMap))
 	for conn, stats := range a.networkMap {
@@ -81,4 +92,12 @@ func (a *Aggregator) ConnectionRows() []netinterface.ConnRow {
 	})
 
 	return rows
+}
+
+func (a *Aggregator) cleanupExpired(now time.Time) {
+	for conn, stats := range a.networkMap {
+		if !stats.LastSeen.IsZero() && now.Sub(stats.LastSeen) > connectionTTL {
+			delete(a.networkMap, conn)
+		}
+	}
 }

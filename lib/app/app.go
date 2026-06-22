@@ -1,8 +1,6 @@
 package app
 
 import (
-	"time"
-
 	"github.com/ikondratev/net-monitor/lib/consoleui"
 	"github.com/ikondratev/net-monitor/lib/netcapture"
 	"github.com/ikondratev/net-monitor/lib/netstats"
@@ -29,19 +27,5 @@ func (a *App) Run() {
 		}
 	}()
 
-	consoleui.ClearScreen()
-	frameIdx := 0
-	rows := a.aggregator.ConnectionRows()
-	lastDataRefresh := time.Now()
-
-	for {
-		if time.Since(lastDataRefresh) >= 5*time.Second {
-			rows = a.aggregator.ConnectionRows()
-			lastDataRefresh = time.Now()
-		}
-
-		consoleui.DrawDashboard(a.device, frameIdx, rows, lastDataRefresh)
-		frameIdx = (frameIdx + 1) % consoleui.FramesCount()
-		time.Sleep(200 * time.Millisecond)
-	}
+	consoleui.RunDashboard(a.device, a.aggregator)
 }

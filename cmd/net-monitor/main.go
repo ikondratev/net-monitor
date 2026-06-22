@@ -2,26 +2,13 @@ package main
 
 import (
 	"log"
+	"os"
 
-	"github.com/ikondratev/net-monitor/lib/app"
-	"github.com/ikondratev/net-monitor/lib/netcapture"
-	"github.com/ikondratev/net-monitor/lib/netdevice"
-	"github.com/ikondratev/net-monitor/lib/netstats"
+	"github.com/ikondratev/net-monitor/lib/cli"
 )
 
 func main() {
-	device, err := netdevice.FindActiveDevice()
-	if err != nil {
-		log.Fatalf("Ошибка: %v", err)
+	if err := cli.Run(os.Args[1:], os.Stdout); err != nil {
+		log.Fatal(err)
 	}
-
-	capture, err := netcapture.Open(device)
-	if err != nil {
-		log.Fatalf("Ошибка открытия интерфейса (нужен sudo): %v", err)
-	}
-
-	defer capture.Close()
-	aggregator := netstats.NewAggregator()
-	application := app.New(device, capture, aggregator)
-	application.Run()
 }

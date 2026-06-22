@@ -1,5 +1,7 @@
 package netinterface
 
+import "time"
+
 type Connection struct {
 	SrcIP   string
 	SrcPort string
@@ -11,6 +13,7 @@ type Connection struct {
 type ConnStats struct {
 	PacketCount int
 	TotalBytes  int
+	LastSeen    time.Time
 }
 
 type ConnRow struct {

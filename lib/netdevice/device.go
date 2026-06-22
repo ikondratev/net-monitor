@@ -1,6 +1,41 @@
 package netdevice
 
-import "github.com/google/gopacket/pcap"
+import (
+	"errors"
+
+	"github.com/google/gopacket/pcap"
+)
+
+type Device struct {
+	Name        string
+	Description string
+	Addresses   []string
+}
+
+func ListDevices() ([]Device, error) {
+	devices, err := pcap.FindAllDevs()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]Device, 0, len(devices))
+	for _, d := range devices {
+		addresses := make([]string, 0, len(d.Addresses))
+		for _, addr := range d.Addresses {
+			if addr.IP != nil {
+				addresses = append(addresses, addr.IP.String())
+			}
+		}
+
+		result = append(result, Device{
+			Name:        d.Name,
+			Description: d.Description,
+			Addresses:   addresses,
+		})
+	}
+
+	return result, nil
+}
 
 func FindActiveDevice() (string, error) {
 	devices, err := pcap.FindAllDevs()
@@ -16,5 +51,5 @@ func FindActiveDevice() (string, error) {
 			}
 		}
 	}
-	return "eth0", nil
+	return "", errors.New("no active network interface found")
 }
