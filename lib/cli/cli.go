@@ -4,9 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/ikondratev/net-monitor/lib/app"
+	"github.com/ikondratev/net-monitor/lib/consoleui"
 	"github.com/ikondratev/net-monitor/lib/netcapture"
 	"github.com/ikondratev/net-monitor/lib/netdevice"
 	"github.com/ikondratev/net-monitor/lib/netstats"
@@ -43,8 +43,9 @@ func Run(args []string, stdout io.Writer) error {
 
 	aggregator := netstats.NewAggregator()
 	application := app.New(device, capture, aggregator)
-	application.Run()
-
+	if err := application.Run(); err != nil {
+		return fmt.Errorf("ui error: %w", err)
+	}
 	return nil
 }
 
@@ -68,15 +69,8 @@ func printInterfaces(stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("failed to list interfaces: %w", err)
 	}
-	for _, device := range devices {
-		fmt.Fprint(stdout, device.Name)
-		if device.Description != "" {
-			fmt.Fprintf(stdout, " - %s", device.Description)
-		}
-		if len(device.Addresses) > 0 {
-			fmt.Fprintf(stdout, " [%s]", strings.Join(device.Addresses, ", "))
-		}
-		fmt.Fprintln(stdout)
+	if err := consoleui.PrintInterfaces(stdout, devices); err != nil {
+		return fmt.Errorf("failed to print interfaces: %w", err)
 	}
 	return nil
 }

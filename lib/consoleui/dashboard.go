@@ -27,12 +27,14 @@ var (
 )
 
 type dashboardModel struct {
-	device          string
-	aggregator      *netstats.Aggregator
-	spinner         spinner.Model
-	table           table.Model
-	lastDataRefresh time.Time
-	totalRows       int
+	device              string
+	aggregator          *netstats.Aggregator
+	spinner             spinner.Model
+	spinerSecond        spinner.Model
+	table               table.Model
+	lastDataRefresh     time.Time
+	totalRows           int
+	isWaitingForTraffic bool
 }
 
 type refreshDataMsg struct{}
@@ -40,6 +42,12 @@ type refreshDataMsg struct{}
 func newDashboardModel(device string, aggregator *netstats.Aggregator) dashboardModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
+
+	s2 := spinner.New()
+	s2.Spinner = spinner.Points
+	s2.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
+
 	styles := table.DefaultStyles()
 	styles.Header = styles.Header.Bold(true).Foreground(lipgloss.Color("212"))
 	styles.Cell = styles.Cell.Foreground(lipgloss.Color("252"))
@@ -60,18 +68,21 @@ func newDashboardModel(device string, aggregator *netstats.Aggregator) dashboard
 	t.SetRows(toTableRows(rows))
 	t.SetStyles(styles)
 	return dashboardModel{
-		device:          device,
-		aggregator:      aggregator,
-		spinner:         s,
-		table:           t,
-		lastDataRefresh: time.Now(),
-		totalRows:       len(rows),
+		device:              device,
+		aggregator:          aggregator,
+		spinner:             s,
+		spinerSecond:        s2,
+		table:               t,
+		lastDataRefresh:     time.Now(),
+		totalRows:           len(rows),
+		isWaitingForTraffic: len(rows) == 0,
 	}
 }
 
 func (m dashboardModel) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
+		m.spinerSecond.Tick,
 		refreshData(),
 	)
 }
@@ -87,12 +98,16 @@ func (m dashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		rows := m.aggregator.ConnectionRows()
 		m.table.SetRows(toTableRows(rows))
 		m.totalRows = len(rows)
+		m.isWaitingForTraffic = len(rows) == 0
 		m.lastDataRefresh = time.Now()
 		return m, refreshData()
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
+		var cmd1 tea.Cmd
+		var cmd2 tea.Cmd
+
+		m.spinner, cmd1 = m.spinner.Update(msg)
+		m.spinerSecond, cmd2 = m.spinerSecond.Update(msg)
+		return m, tea.Batch(cmd1, cmd2)
 	}
 	return m, nil
 }
@@ -110,26 +125,34 @@ func (m dashboardModel) View() string {
 		secondsUntilNextRefresh(m.lastDataRefresh),
 		hiddenRows,
 	))
+	content := m.table.View()
+	if m.isWaitingForTraffic {
+		content = startupBoxStyle.Render(
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				titleStyle.Render(fmt.Sprintf("Interface: %s %s", m.device, m.spinerSecond.View())),
+			),
+		)
+	}
 	footer := helpStyle.Render("Press q or Ctrl+C to quit")
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
 		meta,
 		"",
-		m.table.View(),
+		content,
 		"",
 		footer,
 	)
 }
 
-func RunDashboard(device string, aggregator *netstats.Aggregator) {
+func RunDashboard(device string, aggregator *netstats.Aggregator) error {
 	p := tea.NewProgram(
 		newDashboardModel(device, aggregator),
 		tea.WithAltScreen(),
 	)
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("UI startup error: %v\n", err)
-	}
+	_, err := p.Run()
+	return err
 }
 
 func refreshData() tea.Cmd {

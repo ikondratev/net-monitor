@@ -1,10 +1,11 @@
 # Net Monitor
 
-Simple terminal network monitor written in Go. It captures packets from an active network interface and shows aggregated connection statistics in the console.
+Simple terminal network monitor. It captures packets from an active network interface and shows aggregated connection statistics in the console.
 
 ## Requirements
 
-- Go 1.22 or newer
+- Go 1.24.2 or newer
+- libpcap on macOS/Linux, or Npcap on Windows
 - Permissions to capture network packets
 
 On macOS/Linux, packet capture usually requires `sudo`.
@@ -27,6 +28,18 @@ Run:
 sudo net-monitor
 ```
 
+List available interfaces:
+
+```bash
+net-monitor -si
+```
+
+Capture from a specific interface:
+
+```bash
+sudo net-monitor -i en0
+```
+
 ## Build Locally
 
 ```bash
@@ -38,13 +51,3 @@ Run:
 ```bash
 sudo ./bin/net-monitor
 ```
-
-## Project Structure
-
-- `cmd/net-monitor` - application entrypoint
-- `lib/app` - main application loop
-- `lib/consoleui` - terminal rendering
-- `lib/netcapture` - packet capture setup
-- `lib/netdevice` - network interface detection
-- `lib/netinterface` - connection data structures
-- `lib/netstats` - packet aggregation and sorting

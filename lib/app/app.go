@@ -20,12 +20,12 @@ func New(device string, capture *netcapture.Capture, aggregator *netstats.Aggreg
 	}
 }
 
-func (a *App) Run() {
+func (a *App) Run() error {
 	go func() {
 		for packet := range a.capture.Packets() {
 			a.aggregator.ProcessPacket(packet)
 		}
 	}()
 
-	consoleui.RunDashboard(a.device, a.aggregator)
+	return consoleui.RunDashboard(a.device, a.aggregator)
 }
